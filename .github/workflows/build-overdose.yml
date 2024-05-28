@@ -1,0 +1,74 @@
+name: OverdoseGKI Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-gki-clang:
+    runs-on: ubuntu-24.04
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@main
+
+    - name: Update and install deps
+      run: |
+        sudo apt update -y && sudo apt upgrade -y
+        sudo apt install -y elfutils libarchive-tools
+        sudo add-apt-repository 'deb http://cz.archive.ubuntu.com/ubuntu oracular main multiverse'
+        sudo apt install -y repo
+
+    - name: Init repo
+      run: |
+        repo init -u https://github.com/DarknessKiller/android_kernel_manifest.git -b overdose-gki-5.10 --depth=1
+        sed -i "s#revision=\"android12-5\.10-2023-04_r8/release\"#revision=\"android12-5\.10-lts/release\"#" .repo/manifests/default.xml
+        repo sync --no-tags --no-clone-bundle -j$(nproc --all)
+
+    - name: KernelSU sync and upstream
+      run: |
+        cd common
+        git submodule update --init --recursive
+        git submodule update --remote KernelSU
+
+    - name: Fetch SlimLLVM
+      run: |
+        rm -rf prebuilts-master/clang/host/linux-x86/clang-r416183b
+        git clone https://gitlab.com/xummarik/SlimLLVM.git -b main --depth=1 prebuilts-master/clang/host/linux-x86/clang-r416183b
+
+    - name: Build Kernel
+      run: |
+        sed -i s/build-user/mrdarknessk/g build/_setup_env.sh
+        sed -i s/build-host/github-actions/g build/_setup_env.sh
+        LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64.overdose build/build.sh
+
+    - name: Prepare kernel image
+      run: cp out/android12-5.10/dist/Image ak3/
+
+    - name: Set build date/time
+      id: date
+      run: echo "DATE=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@main
+      with:
+        name: OverdoseGKI-5.10-${{ env.DATE }}
+        compression-level: 9
+        path: |
+          ak3/*
+          !ak3/.git
+          !ak3/.github
+          !ak3/README.md
+          !ak3/*/placeholder
+
+    - name: Create zip for release
+      run: |
+        cd ak3/ && zip -r9 OverdoseGKI-5.10-${{ env.DATE }}.zip * -x .git README.md ./*/placeholder
+        cd ../
+        cp ak3/OverdoseGKI-5.10-${{ env.DATE }}.zip ${{ github.workspace }}
+
+    - name: Publish release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "${{ env.DATE }}" --notes "CI Build" -p OverdoseGKI-5.10-${{ env.DATE }}.zip
