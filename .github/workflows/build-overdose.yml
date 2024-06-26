@@ -15,7 +15,7 @@ jobs:
     - name: Update and install deps
       run: |
         sudo add-apt-repository 'deb http://cz.archive.ubuntu.com/ubuntu oracular main multiverse'
-        sudo apt-get install -y repo elfutils libarchive-tools libasm1t64 python3-kerberos gpg
+        sudo apt-get install -y repo
 
     - name: Init repo
       run: |
