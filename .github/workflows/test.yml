@@ -1,4 +1,4 @@
-name: OverdoseGKI Build (no KSU)
+name: OverdoseGKI Build (Test)
 
 on:
   workflow_dispatch:
@@ -25,20 +25,16 @@ jobs:
         sed -i "s#revision=\"android12-5\.10-2023-04_r8/release\"#revision=\"android12-5\.10-lts/release\"#" .repo/manifests/default.xml
         repo sync --no-tags --no-clone-bundle -j$(nproc --all)
 
-    - name: Delete KSU and add CONFIG_KALLSYMS for APatch
+    - name: KernelSU sync and upstream
       run: |
-        sed -i '/source "drivers\/kernelsu\/Kconfig"/d' common/drivers/Kconfig
-        sed -i '/obj-$(CONFIG_KSU) += kernelsu\//d' common/drivers/Makefile
-        rm -f common/drivers/kernelsu
-        rm -rf common/KernelSU
-        echo "CONFIG_KALLSYMS=y" >> common/arch/arm64/configs/gki_defconfig
-        echo "CONFIG_KALLSYMS_ALL=y" >> common/arch/arm64/configs/gki_defconfig
-
+        cd common
+        git submodule update --init --recursive
+        git submodule update --remote KernelSU
 
     - name: Fetch SlimLLVM
       run: |
         rm -rf prebuilts-master/clang/host/linux-x86/clang-r416183b
-        git clone https://gitlab.com/xummarik/SlimLLVM.git -b main --depth=1 prebuilts-master/clang/host/linux-x86/clang-r416183b
+        git clone https://gitlab.com/xummarik/SlimLLVM.git -b yuki19.0.0 --depth=1 prebuilts-master/clang/host/linux-x86/clang-r416183b
 
     - name: Build Kernel
       run: |
@@ -56,7 +52,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@main
       with:
-        name: OverdoseGKI-5.10-${{ env.DATE }}-noKSU
+        name: OverdoseGKI-5.10-${{ env.DATE }}
         compression-level: 9
         path: |
           ak3/*
@@ -65,14 +61,14 @@ jobs:
           !ak3/README.md
           !ak3/*/placeholder
 
-    - name: Create zip for release
-      run: |
-        cd ak3/ && zip -r9 OverdoseGKI-5.10-${{ env.DATE }}-noKSU.zip * -x .git README.md ./*/placeholder
-        cd ../
-        cp ak3/OverdoseGKI-5.10-${{ env.DATE }}-noKSU.zip ${{ github.workspace }}
+    # - name: Create zip for release
+    #   run: |
+    #     cd ak3/ && zip -r9 OverdoseGKI-5.10-${{ env.DATE }}.zip * -x .git README.md ./*/placeholder
+    #     cd ../
+    #     cp ak3/OverdoseGKI-5.10-${{ env.DATE }}.zip ${{ github.workspace }}
 
-    - name: Publish release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      run: |
-        gh release create "${{ env.DATE }}-noKSU" --notes "CI Build (without KSU)" -p OverdoseGKI-5.10-${{ env.DATE }}-noKSU.zip
+    # - name: Publish release
+    #   env:
+    #     GITHUB_TOKEN: ${{ github.token }}
+    #   run: |
+    #     gh release create "${{ env.DATE }}" --notes "CI Build" -p OverdoseGKI-5.10-${{ env.DATE }}.zip
