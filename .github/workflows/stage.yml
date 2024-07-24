@@ -1,4 +1,4 @@
-name: OverdoseGKI Build (Test)
+name: Stage Build
 
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
     - name: Init repo
       run: |
         repo init -u https://github.com/DarknessKiller/android_kernel_manifest.git -b overdose-gki-5.10 --depth=1
-        sed -i "s#revision=\"android12-5\.10-2023-04_r8/release\"#revision=\"android12-5\.10-lts/release\"#" .repo/manifests/default.xml
+        sed -i "s#revision=\"android12-5\.10-2023-04_r8/release\"#revision=\"android12-5\.10-lts/staging\"#" .repo/manifests/default.xml
         repo sync --no-tags --no-clone-bundle -j$(nproc --all)
 
     - name: KernelSU sync and upstream
@@ -34,7 +34,7 @@ jobs:
     - name: Fetch SlimLLVM
       run: |
         rm -rf prebuilts-master/clang/host/linux-x86/clang-r416183b
-        git clone https://gitlab.com/xummarik/SlimLLVM.git -b yuki19.0.0 --depth=1 prebuilts-master/clang/host/linux-x86/clang-r416183b
+        git clone https://gitlab.com/xummarik/SlimLLVM.git -b main --depth=1 prebuilts-master/clang/host/linux-x86/clang-r416183b
 
     - name: Build Kernel
       run: |
@@ -61,14 +61,14 @@ jobs:
           !ak3/README.md
           !ak3/*/placeholder
 
-    # - name: Create zip for release
-    #   run: |
-    #     cd ak3/ && zip -r9 OverdoseGKI-5.10-${{ env.DATE }}.zip * -x .git README.md ./*/placeholder
-    #     cd ../
-    #     cp ak3/OverdoseGKI-5.10-${{ env.DATE }}.zip ${{ github.workspace }}
+    - name: Create zip for release
+      run: |
+        cd ak3/ && zip -r9 OverdoseGKI-5.10-${{ env.DATE }}.zip * -x .git README.md ./*/placeholder
+        cd ../
+        cp ak3/OverdoseGKI-5.10-${{ env.DATE }}.zip ${{ github.workspace }}
 
-    # - name: Publish release
-    #   env:
-    #     GITHUB_TOKEN: ${{ github.token }}
-    #   run: |
-    #     gh release create "${{ env.DATE }}" --notes "CI Build" -p OverdoseGKI-5.10-${{ env.DATE }}.zip
+    - name: Publish release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "${{ env.DATE }}" --notes "CI Build" -p OverdoseGKI-5.10-${{ env.DATE }}.zip
